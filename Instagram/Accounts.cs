@@ -93,12 +93,12 @@ namespace Madamin.Unfollow.Instagram
 
         private string GetAccountStatePath(Account account)
         {
-            return Path.Combine(DataDir, account.Data.User.Id.ToString());
+            return Path.Combine(DataDir, account.User.Id.ToString());
         }
 
         private string GetAccountCachePath(Account account)
         {
-            return Path.Combine(CacheDir, account.Data.User.Id.ToString());
+            return Path.Combine(CacheDir, account.User.Id.ToString());
         }
 
         public void SaveAccountState(Account account)

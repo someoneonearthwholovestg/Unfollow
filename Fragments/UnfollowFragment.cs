@@ -26,7 +26,7 @@ namespace Madamin.Unfollow.Fragments
 
         private void UnfollowFragment_Create(object sender, OnCreateEventArgs e)
         {
-            Title = _account.Data.User.Fullname;
+            Title = _account.User.Fullname;
             // TODO: set ErrorText
             // TODO: set EmptyText
             SetEmptyImage(Resource.Drawable.ic_person_remove_black_48dp);
@@ -97,7 +97,7 @@ namespace Madamin.Unfollow.Fragments
             if (_action_mode == null)
             {
                 _action_mode = ((AppCompatActivity)Activity).StartSupportActionMode(this);
-                _action_mode.Title = _account.Data.User.Fullname;
+                _action_mode.Title = _account.User.Fullname;
             }
 
             _action_mode.Subtitle = string.Format(

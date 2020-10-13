@@ -23,7 +23,7 @@ namespace Madamin.Unfollow.Adapters
             if (account_view_holder == null)
                 return;
 
-            account_view_holder.BindData(_data[position].Data);
+            account_view_holder.BindData(_data[position]);
         }
 
         public override RecyclerView.ViewHolder OnCreateViewHolder(ViewGroup parent, int viewType)

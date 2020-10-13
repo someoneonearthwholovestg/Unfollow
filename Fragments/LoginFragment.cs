@@ -48,7 +48,7 @@ namespace Madamin.Unfollow.Fragments
 
                 PopFragment();
             }
-            catch (WrongPasswordException)
+            catch (BadPasswordException)
             {
                 _et_layout_password.Error = GetString(Resource.String.error_invalid_password);
                 _et_password.TextChanged += (et, args) =>

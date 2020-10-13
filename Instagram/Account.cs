@@ -5,9 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Threading.Tasks;
 
-using InstagramApiSharp.Classes;
-using IInstaApi = InstagramApiSharp.API.IInstaApi;
-using InstaApiBuilder = InstagramApiSharp.API.Builder.InstaApiBuilder;
+using Madamin.Unfollow.Instagram.API;
 
 namespace Madamin.Unfollow.Instagram
 {
@@ -15,11 +13,6 @@ namespace Madamin.Unfollow.Instagram
     {
         internal Account()
         {
-            _api = InstaApiBuilder.CreateBuilder()
-                .SetUser(UserSessionData.Empty)
-                .SetRequestDelay(RequestDelay.FromSeconds(0, 1))
-                .Build();
-            _api.SetApiVersion(InstagramApiSharp.Enums.InstaApiVersionType.Version126);
         }
 
         internal async Task LoginAsync(string username, string password)
@@ -27,29 +20,7 @@ namespace Madamin.Unfollow.Instagram
             // no need to authenticate again
             if (_api.IsUserAuthenticated) return;
 
-            _api.SetUser(username, password);
-
-            await _api.SendRequestsBeforeLoginAsync();
-            await Task.Delay(5000);
-
-            var result = await _api.LoginAsync();
-
-            switch (result.Value)
-            {
-                case InstaLoginResult.Success:
-                    await _api.SendRequestsAfterLoginAsync();
-                    return;
-
-                case InstaLoginResult.BadPassword:
-                    throw new WrongPasswordException();
-
-                case InstaLoginResult.ChallengeRequired:
-                    throw new ChallengeException();
-
-                default:
-                    throw result.Info.Exception ??
-                        new InstagramException(result.Info.Message);
-            }
+            await _api.LoginAsync(username, password);
         }
 
         internal async Task LogoutAsync()
@@ -57,11 +28,7 @@ namespace Madamin.Unfollow.Instagram
             if (!_api.IsUserAuthenticated)
                 throw new UserNotAuthenticatedException();
 
-            var result = await _api.LogoutAsync();
-
-            if (!result.Succeeded)
-                throw result.Info.Exception ??
-                    new InstagramException(result.Info.Message);
+            await _api.LogoutAsync();
         }
 
         internal void SaveState(string path)
@@ -69,10 +36,9 @@ namespace Madamin.Unfollow.Instagram
             if (!_api.IsUserAuthenticated)
                 throw new UserNotAuthenticatedException();
 
-            var state = _api.GetStateDataAsObject();
             using (var file = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
-                new BinaryFormatter().Serialize(file, state);
+                new BinaryFormatter().Serialize(file, _api.State);
             }
         }
 
@@ -80,8 +46,7 @@ namespace Madamin.Unfollow.Instagram
         {
             using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
-                var state = (StateData)new BinaryFormatter().Deserialize(file);
-                _api.LoadStateDataFromObject(state);
+                _api.State = new BinaryFormatter().Deserialize(file);
             }
         }
 
@@ -103,7 +68,7 @@ namespace Madamin.Unfollow.Instagram
 
             using (var file = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
-                Data = (AccountData)new BinaryFormatter().Deserialize(file);
+                Data = (DataCache)new BinaryFormatter().Deserialize(file);
             }
         }
 
@@ -112,135 +77,52 @@ namespace Madamin.Unfollow.Instagram
             if (!_api.IsUserAuthenticated)
                 throw new UserNotAuthenticatedException();
 
-            // request user data
-            var user_edit_req = await _api.AccountProcessor.GetRequestForEditProfileAsync();
-            if (!user_edit_req.Succeeded)
-                throw user_edit_req.Info.Exception ??
-                    new InstagramException(user_edit_req.Info.Message);
+            var followings = await _api.GetFollowingsAsync(User.Id);
+            var followers = await _api.GetFollowersAsync(User.Id);
 
-            var user = new User(
-                user_edit_req.Value.Pk,
-                user_edit_req.Value.Username,
-                user_edit_req.Value.FullName);
-
-            // request user followers
-            var followers_req = await _api.UserProcessor
-                .GetCurrentUserFollowersAsync(InstagramApiSharp.PaginationParameters.Empty);
-            if (!followers_req.Succeeded)
-                throw followers_req.Info.Exception ??
-                    new InstagramException(followers_req.Info.Message);
-            
-            var followers = from follower in followers_req.Value
-                            select new User(follower.Pk, follower.UserName, follower.FullName);
-
-            // request user followings
-            var followings_req = await _api.UserProcessor
-                .GetUserFollowingAsync(
-                user.Username,
-                InstagramApiSharp.PaginationParameters.Empty);
-            if (!followings_req.Succeeded)
-                throw followings_req.Info.Exception ??
-                    new InstagramException(followers_req.Info.Message);
-
-            var followings = from following in followings_req.Value
-                             select new User(following.Pk, following.UserName, following.FullName);
-
-            // save data
-            Data = new AccountData(user, followers, followings);
+            Data = new DataCache(followers, followings);
         }
 
         public async Task UnfollowAsync(User user)
         {
-            var result = await _api.UserProcessor.UnFollowUserAsync(user.Id);
-            if (!result.Succeeded)
-                throw result.Info.Exception ??
-                    new InstagramException(result.Info.Message); ;
-
+            await _api.UnfollowAsync(user.Id);
             Data.Followings.Remove(user);
         }
 
         public override bool Equals(object obj)
         {
             return obj is Account account &&
-                   EqualityComparer<AccountData>.Default.Equals(Data, account.Data);
+                   EqualityComparer<User>.Default.Equals(User, account.User);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(Data);
+            return HashCode.Combine(User);
         }
 
-        public AccountData Data { get; private set; }
+        public User User => _api.User;
 
-        private IInstaApi _api;
+        public DataCache Data { get; private set; }
+
+        private InstaApi _api = new InstaApi();
 
         [Serializable]
-        public class AccountData
+        public class DataCache
         {
-            public AccountData(
-                User user,
+            public DataCache(
                 IEnumerable<User> followers,
                 IEnumerable<User> followings)
             {
-                User = user;
                 Followers = followers.ToList();
                 Followings = followings.ToList();
             }
-            public User User { get; }
 
             public List<User> Followers { get; }
             public List<User> Followings { get; }
 
             public IEnumerable<User> Unfollowers => Followings.Except(Followers);
-
-            public override bool Equals(object obj)
-            {
-                return obj is AccountData data &&
-                       EqualityComparer<User>.Default.Equals(User, data.User);
-            }
-
-            public override int GetHashCode()
-            {
-                return HashCode.Combine(User);
-            }
-        }
-    }
-
-    [Serializable]
-    public class User
-    {
-        public User(
-            long userid,
-            string username,
-            string fullname)
-        {
-            Id = userid;
-            Username = username;
-            Fullname = fullname;
-        }
-
-        public string Username { get; }
-        public string Fullname { get; }
-        public long Id { get; }
-
-        public override bool Equals(object obj)
-        {
-            return obj is User user &&
-                   Id == user.Id;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Id);
         }
     }
 
     public class AccountDataNotAvailableException : Exception { }
-    public class UserNotAuthenticatedException : Exception { }
-    public class WrongPasswordException : Exception { }
-    public class ChallengeException : Exception { }
-    public class InstagramException : Exception 
-    { 
-        public InstagramException(string message) : base (message) {}
-    }
 }

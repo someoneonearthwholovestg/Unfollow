@@ -44,13 +44,13 @@ namespace Madamin.Unfollow.ViewHolders
             _card.Click += Item_Click;
         }
 
-        public void BindData(Account.AccountData data)
+        public void BindData(Account data)
         {
             _tv_fullname.Text = data.User.Fullname;
             _tv_username.Text = "@" + data.User.Username;
-            _tv_followings.Text = data.Followings.Count.ToString();
-            _tv_followers.Text = data.Followers.Count.ToString();
-            _tv_unfollowers.Text = data.Unfollowers.Count().ToString();
+            _tv_followings.Text = data.Data.Followings.Count.ToString();
+            _tv_followers.Text = data.Data.Followers.Count.ToString();
+            _tv_unfollowers.Text = data.Data.Unfollowers.Count().ToString();
         }
 
         private void Item_Click(object sender, EventArgs e)

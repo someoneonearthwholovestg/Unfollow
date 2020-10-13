@@ -49,7 +49,7 @@ namespace Madamin.Unfollow.Fragments
         public void OnItemOpenInstagram(int position)
         {
             ((IInstagramHost)Activity).OpenInInstagram(
-                _adapter.GetItem(position).Data.User.Username);
+                _adapter.GetItem(position).User.Username);
         }
 
         public async void OnItemLogout(int position)
